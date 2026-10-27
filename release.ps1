@@ -30,17 +30,16 @@
     Skip the final `butler status` call.
 
 .PARAMETER HookPath
-    PowerShell script executed after a successful push.
-    Default: .itchio-release-hook.ps1 next to this script, if present.
-
-.PARAMETER NoHook
-    Do not run any post-release hook.
+    Optional PowerShell script executed after a successful push.
 
 .EXAMPLE
     ./release.ps1 -Source ./dist -Target youruser/yourgame -Channel windows -Version 1.0.0
 
 .EXAMPLE
     ./release.ps1 -Source ./dist -Target youruser/yourgame -DryRun
+
+.EXAMPLE
+    ./release.ps1 -Source ./dist -Target youruser/yourgame -HookPath ./examples/post-release-hook.ps1
 #>
 [CmdletBinding()]
 param(
@@ -60,9 +59,7 @@ param(
 
     [switch]$SkipStatus,
 
-    [string]$HookPath,
-
-    [switch]$NoHook
+    [string]$HookPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -141,17 +138,13 @@ if (-not $SkipStatus) {
     & $butler status $Target
 }
 
-if (-not $NoHook) {
-    $hook = $HookPath
-    if (-not $hook) {
-        $candidate = Join-Path $PSScriptRoot '.itchio-release-hook.ps1'
-        if (Test-Path -LiteralPath $candidate) { $hook = $candidate }
+if ($HookPath) {
+    if (-not (Test-Path -LiteralPath $HookPath)) {
+        throw "Hook script not found: $HookPath"
     }
-    if ($hook -and (Test-Path -LiteralPath $hook)) {
-        Write-Host ""
-        Write-Host "Running post-release hook: $hook" -ForegroundColor Cyan
-        & $hook
-    }
+    Write-Host ""
+    Write-Host "Running post-release hook: $HookPath" -ForegroundColor Cyan
+    & $HookPath
 }
 
 Write-Host ""

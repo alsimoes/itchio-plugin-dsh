@@ -1,9 +1,10 @@
-# itch.io Release Hook
-# Runs after a successful release when invoked by release.ps1 (unless -NoHook is passed).
+# Example post-release hook.
+# Pass it explicitly when running a release:
+#   ./release.ps1 -Source ./dist -Target user/game -HookPath ./examples/post-release-hook.ps1
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "itch.io Release Hook - running..." -ForegroundColor Cyan
+Write-Host "itch.io release hook - running..." -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
 $isWindowsOS = if ($PSVersionTable.PSVersion.Major -ge 6) { $IsWindows } else { $true }

@@ -17,6 +17,8 @@ Uploading builds by hand is repetitive and easy to get wrong. This project wraps
 
 Both paths call the same `butler` binary, so behavior is identical and no custom upload protocol is involved.
 
+The repository deliberately contains **one** operational PowerShell script (`release.ps1`). Diagnostics live in a small platform-neutral Node.js script, and the post-release hook is an optional example passed explicitly.
+
 ## Platform support
 
 The plugin is pure Node.js/ES modules with no native dependencies, so it runs wherever the DeepSeek Harness runs. The standalone script requires PowerShell, which is available on all three platforms.
@@ -26,10 +28,8 @@ The plugin is pure Node.js/ES modules with no native dependencies, so it runs wh
 | DeepSeek Harness plugin | ✅ | ✅ | ✅ |
 | Automatic butler detection | ✅ | ✅ | ✅ |
 | `release.ps1` (PowerShell 7+) | ✅ | ✅ | ✅ |
-| `install.sh` (bash diagnostics) | Git Bash / WSL | ✅ | ✅ |
+| `test-release.js` diagnostics | ✅ | ✅ | ✅ |
 | Post-release hook | ✅ | ✅ (PowerShell 7+) | ✅ (PowerShell 7+) |
-
-No platform-specific build step is needed: install the plugin, make `butler` reachable, and run the same commands.
 
 ## Features
 
@@ -105,7 +105,7 @@ The bundle registers a single row with id `itchio-manager`.
 
 ### Standalone script
 
-No installation is required. Download or clone the repository and run `release.ps1` (see [Standalone script reference](#standalone-script-reference)).
+No installation is required. Download or clone the repository and run `release.ps1` (see [Standalone script reference](#standalone-script-reference)). Run `node test-release.js` to check butler, credentials, and configuration first.
 
 ## Quick start
 
@@ -136,7 +136,7 @@ butler push ./dist youruser/yourgame:linux --userversion 1.0.0
 butler status youruser/yourgame
 ```
 
-After a successful push, `release.ps1` prints `butler status` and runs `.itchio-release-hook.ps1` if it exists.
+After a successful push, `release.ps1` prints `butler status` and runs the hook passed with `-HookPath`, if any.
 
 ## Tools (DeepSeek Harness)
 
@@ -169,8 +169,7 @@ After a successful push, `release.ps1` prints `butler status` and runs `.itchio-
 | `-ButlerPath` | no | Explicit path to the butler executable. |
 | `-DryRun` | no | Preview the upload without publishing. |
 | `-SkipStatus` | no | Skip the final `butler status` call. |
-| `-HookPath` | no | Custom post-release hook script. |
-| `-NoHook` | no | Do not run any post-release hook. |
+| `-HookPath` | no | Hook script executed after a successful push. |
 
 ## Configuration
 
@@ -255,43 +254,39 @@ Push only the final build folder. Avoid uploading intermediate directories such 
 
 ## Post-release hooks
 
-After a successful push, `release.ps1` runs `.itchio-release-hook.ps1` from the repository root, unless `-NoHook` is passed. On macOS and Linux the hook runs through PowerShell 7+, so it has the same capabilities as on Windows. Use it for notifications, changelog updates, or opening the game page. A minimal hook is included in this repository.
+Hooks are opt-in. After a successful push, `release.ps1` runs the script passed with `-HookPath`:
+
+```powershell
+./release.ps1 -Source ./dist -Target youruser/mygame -HookPath ./examples/post-release-hook.ps1
+```
+
+See [`examples/post-release-hook.ps1`](examples/post-release-hook.ps1). On macOS and Linux the hook runs through PowerShell 7+, so it has the same capabilities as on Windows.
 
 ## Diagnostics
 
-**Windows:**
-
-```powershell
-./install.ps1
-node test-release.js
-node test-release.js user/game
-```
-
-**macOS and Linux:**
+`test-release.js` is platform-neutral and checks butler, its version, credentials, the configured target, and channel status:
 
 ```bash
-./install.sh          # bash environment check
-pwsh ./install.ps1    # equivalent check through PowerShell 7+
 node test-release.js
 node test-release.js user/game
 ```
+
+It requires Node.js, which is already available wherever the DeepSeek Harness runs.
 
 ## Project structure
 
 ```
 .
-├── index.js                  # DeepSeek Harness plugin (Host half)
-├── cordis.patch.yml          # Bundle patch (plugin row and config)
-├── example-config.yml        # Configuration example
-├── locale/en.json            # Plugin display metadata
-├── icon.svg                  # Plugin icon
-├── release.ps1               # Standalone release script (all platforms)
-├── install.ps1               # Environment checks (PowerShell, all platforms)
-├── install.bat               # Environment checks (Windows batch)
-├── install.sh                # Environment checks (bash: macOS/Linux)
-├── test-release.js           # Node.js diagnostics
-├── .itchio-release-hook.ps1  # Optional post-release hook
-├── LICENSE.md                # MIT license
+├── index.js                        # DeepSeek Harness plugin (Host half)
+├── cordis.patch.yml                # Bundle patch (plugin row and config)
+├── example-config.yml              # Configuration example
+├── locale/en.json                  # Plugin display metadata
+├── icon.svg                        # Plugin icon
+├── release.ps1                     # The only operational PowerShell script
+├── test-release.js                 # Diagnostics (Node.js, all platforms)
+├── examples/
+│   └── post-release-hook.ps1       # Optional hook, passed with -HookPath
+├── LICENSE.md                      # MIT license
 └── README.md
 ```
 
@@ -317,7 +312,7 @@ node test-release.js user/game
 
 ## Contributing
 
-Issues and pull requests are welcome. Keep changes focused, run the diagnostics for your platform before submitting, and update the README when behavior changes.
+Issues and pull requests are welcome. Keep changes focused, run the diagnostics before submitting, and update the README when behavior changes.
 
 ## License
 
