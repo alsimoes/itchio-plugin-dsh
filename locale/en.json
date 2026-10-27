@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "itch.io Plugin",
+    "description": "Publishes game builds to itch.io with the official butler CLI (push and status)."
+  }
+}

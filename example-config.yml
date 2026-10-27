@@ -1,0 +1,13 @@
+# Example configuration for the itch.io Plugin.
+# Copy these settings into the bundle's cordis.patch.yml, or use them when installing.
+
+- insert:
+    - id: itchio-manager
+      name: 'itchio-plugin-dsh'
+      config:
+        # Required for the push/status tools when no target is passed per call.
+        target: 'user/game'
+        # Default channel when a tool call does not pass one.
+        defaultChannel: windows
+        # Optional butler path. Empty = auto-detect.
+        butlerPath: ''

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Itch.io Release Manager">
+  <rect width="64" height="64" rx="14" fill="#fa5c5c"/>
+  <path d="M32 12l15 15h-9.5v13h-11V27H17z" fill="#ffffff"/>
+  <rect x="16" y="45" width="32" height="7" rx="3.5" fill="#ffffff"/>
+</svg>

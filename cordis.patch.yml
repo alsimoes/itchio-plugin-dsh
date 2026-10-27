@@ -1,0 +1,10 @@
+- insert:
+    - id: itchio-manager
+      name: 'itchio-plugin-dsh'
+      config:
+        # itch.io project in "user/game" format (required for push/status).
+        target: ''
+        # Default channel when a tool call does not pass one.
+        defaultChannel: windows
+        # Optional butler path. Empty = auto-detect (itch.io app, BUTLER_PATH, or PATH).
+        butlerPath: ''
