@@ -4,7 +4,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue.svg)](#platform-support)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-5b21b6.svg)](#installation)
 
-A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin and a standalone PowerShell script for publishing game builds to **itch.io** through the official **butler** CLI.
+A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin and a standalone Node.js CLI for publishing game builds to **itch.io** through the official **butler** CLI.
 
 > This project is not affiliated with or endorsed by itch.io. itch.io and butler are products of itch.io.
 
@@ -13,23 +13,23 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin and
 Uploading builds by hand is repetitive and easy to get wrong. This project wraps the official [`butler`](https://itch.io/docs/butler/) workflow in two ways:
 
 - **A DeepSeek Harness plugin** that registers `itchio_push` and `itchio_status` tools, so an agent can publish and inspect builds directly.
-- **A standalone `release.ps1` script** that works without the harness, for local or CI use.
+- **A standalone `release.js` CLI** that works without the harness, for local or CI use.
 
 Both paths call the same `butler` binary, so behavior is identical and no custom upload protocol is involved.
 
-The repository deliberately contains **one** operational PowerShell script (`release.ps1`). Diagnostics live in a small platform-neutral Node.js script, and the post-release hook is an optional example passed explicitly.
+Everything except butler itself is Node.js. There is no platform-specific code, no shell wrapper, and no PowerShell dependency: the plugin, the CLI, the diagnostics, and the example hook run identically on Windows, macOS, and Linux.
 
 ## Platform support
-
-The plugin is pure Node.js/ES modules with no native dependencies, so it runs wherever the DeepSeek Harness runs. The standalone script requires PowerShell, which is available on all three platforms.
 
 | Capability | Windows | macOS | Linux |
 |------------|---------|-------|-------|
 | DeepSeek Harness plugin | ✅ | ✅ | ✅ |
+| `release.js` CLI | ✅ | ✅ | ✅ |
 | Automatic butler detection | ✅ | ✅ | ✅ |
-| `release.ps1` (PowerShell 7+) | ✅ | ✅ | ✅ |
-| `test-release.js` diagnostics | ✅ | ✅ | ✅ |
-| Post-release hook | ✅ | ✅ (PowerShell 7+) | ✅ (PowerShell 7+) |
+| Diagnostics (`check`) | ✅ | ✅ | ✅ |
+| Node.js post-release hook | ✅ | ✅ | ✅ |
+
+Requirements are the same everywhere: Node.js and butler.
 
 ## Features
 
@@ -37,20 +37,19 @@ The plugin is pure Node.js/ES modules with no native dependencies, so it runs wh
 - Channel status inspection with `itchio_status` / `butler status`.
 - Automatic butler detection: bundled with the itch.io desktop app, `BUTLER_PATH`, or `PATH`.
 - Dry-run mode to preview the upload without publishing.
-- Optional post-release hook script.
-- Runs on Windows, macOS, and Linux.
-- Zero runtime dependencies for the plugin.
+- Optional post-release hook, written in Node.js.
+- Runs on Windows, macOS, and Linux with the same commands.
+- Zero npm dependencies for the plugin and the CLI.
 - Credentials stay in butler's own store; no API keys are kept in this repository or plugin config.
 
 ## Requirements
 
-| Requirement | Windows | macOS | Linux |
-|-------------|---------|-------|-------|
-| butler | itch.io desktop app, or standalone | itch.io desktop app, or standalone | itch.io desktop app, or standalone |
-| Authentication | `butler login` (once) | `butler login` (once) | `butler login` (once) |
-| Plugin runtime | Node.js 18+ (provided by DeepSeek Harness) | same | same |
-| Standalone script | PowerShell 5.1+ or 7+ | PowerShell 7+ | PowerShell 7+ |
-| itch.io project | `user/game` slug | same | same |
+| Requirement | Notes |
+|-------------|-------|
+| **butler** | Bundled with the itch.io desktop app, or installed standalone. |
+| **Authentication** | Run `butler login` once. butler stores credentials at `~/.config/itch/butler_creds` unless `--identity` is used. |
+| **Node.js 18+** | Used by the plugin, the CLI, and the diagnostics. The DeepSeek Harness already runs on Node.js. |
+| **itch.io project** | A slug in the form `user/game`. |
 
 ### Installing butler
 
@@ -58,7 +57,7 @@ The itch.io desktop app bundles butler and keeps it updated, which is the simple
 
 **Windows** — extract the `.zip`, add the folder to `PATH`, then run:
 
-```powershell
+```bash
 butler login
 ```
 
@@ -75,15 +74,13 @@ Verify the installation on any platform:
 butler version
 ```
 
-The plugin searches for butler in this order: the `butlerPath` config value, the `BUTLER_PATH` environment variable, the itch.io desktop app's data directory, then `PATH`. The app-bundled locations are:
+The plugin and CLI search for butler in this order: an explicit `--butler`/`butlerPath` value, the `BUTLER_PATH` environment variable, the itch.io desktop app's data directory, then `PATH`. The app-bundled locations are:
 
 | OS | Bundled butler root |
 |----|---------------------|
 | Windows | `%APPDATA%\itch\broth\butler` |
 | macOS | `~/Library/Application Support/itch/broth/butler` |
 | Linux | `~/.config/itch/broth/butler` |
-
-butler stores credentials at `~/.config/itch/butler_creds` on all platforms unless `--identity` is used.
 
 ## Installation
 
@@ -103,40 +100,28 @@ The installation is identical on Windows, macOS, and Linux:
 
 The bundle registers a single row with id `itchio-manager`.
 
-### Standalone script
+### Standalone CLI
 
-No installation is required. Download or clone the repository and run `release.ps1` (see [Standalone script reference](#standalone-script-reference)). Run `node test-release.js` to check butler, credentials, and configuration first.
+No installation is required. Clone the repository and run the CLI with Node.js (see [CLI reference](#cli-reference)). The same commands work on every platform.
 
 ## Quick start
 
-**Windows (Windows PowerShell or PowerShell 7+):**
-
-```powershell
-# Preview the upload without publishing
-./release.ps1 -Source ./dist -Target youruser/yourgame -Channel windows -DryRun
-
-# Publish for real
-./release.ps1 -Source ./dist -Target youruser/yourgame -Channel windows -Version 1.0.0
-```
-
-**macOS and Linux (PowerShell 7+):**
-
 ```bash
 # Preview the upload without publishing
-pwsh ./release.ps1 -Source ./dist -Target youruser/yourgame -Channel linux -DryRun
+node release.js push --source ./dist --target youruser/yourgame --channel windows --dry-run
 
 # Publish for real
-pwsh ./release.ps1 -Source ./dist -Target youruser/yourgame -Channel linux -Version 1.0.0
+node release.js push --source ./dist --target youruser/yourgame --channel windows --version 1.0.0
+
+# Verify the environment
+node release.js check
 ```
 
-If PowerShell is not available, call butler directly — the plugin and script only wrap these commands:
+The commands are identical on Windows, macOS, and Linux. If you prefer, the CLI is also executable on Unix-like systems: `./release.js push ...`.
 
-```bash
-butler push ./dist youruser/yourgame:linux --userversion 1.0.0
-butler status youruser/yourgame
-```
+If PowerShell, batch, or Bash is unavailable, that is not a problem: only Node.js is needed.
 
-After a successful push, `release.ps1` prints `butler status` and runs the hook passed with `-HookPath`, if any.
+After a successful push, the CLI prints `butler status` and runs the hook passed with `--hook`, if any.
 
 ## Tools (DeepSeek Harness)
 
@@ -156,20 +141,34 @@ After a successful push, `release.ps1` prints `butler status` and runs the hook 
 |-----------|------|----------|-------------|
 | `target` | string | no | itch.io project as `user/game`. Defaults to the `target` config value. |
 
-## Standalone script reference
+## CLI reference
 
-`release.ps1` runs on Windows PowerShell 5.1+, PowerShell 7+ on Windows, and PowerShell 7+ on macOS/Linux. On macOS/Linux invoke it with `pwsh ./release.ps1`.
+### Commands
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `-Source` | yes | Build directory or `.zip` file to upload. |
-| `-Target` | yes | itch.io project in `user/game` format. |
-| `-Channel` | no | Upload channel. Default: `windows`. |
-| `-Version` | no | Version string passed as `--userversion`. |
-| `-ButlerPath` | no | Explicit path to the butler executable. |
-| `-DryRun` | no | Preview the upload without publishing. |
-| `-SkipStatus` | no | Skip the final `butler status` call. |
-| `-HookPath` | no | Hook script executed after a successful push. |
+| Command | Description |
+|---------|-------------|
+| `push` | Upload a build to itch.io with butler. |
+| `check` | Verify butler, credentials, config, and optionally channel status. |
+
+### `push` options
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `-s`, `--source <path>` | yes | Build directory or `.zip` file to upload. |
+| `-t`, `--target <user/game>` | yes | itch.io project slug. |
+| `-c`, `--channel <name>` | no | Upload channel. Default: `windows` (or `defaultChannel` from config). |
+| `-v`, `--version <value>` | no | Version string passed as `--userversion`. |
+| `-b`, `--butler <path>` | no | Explicit butler path. |
+| `--dry-run` | no | List what would be uploaded, without publishing. |
+| `--skip-status` | no | Skip the final `butler status` call. |
+| `--hook <path>` | no | Node.js script executed after a successful push. |
+
+### `check`
+
+```bash
+node release.js check            # uses the configured target, if any
+node release.js check user/game  # also queries channel status
+```
 
 ## Configuration
 
@@ -191,7 +190,7 @@ The plugin reads configuration from `cordis.patch.yml` (see [`example-config.yml
 | `defaultChannel` | `windows` | Channel used when a tool call omits `channel`. |
 | `butlerPath` | empty | Explicit butler path. Empty enables auto-detection. |
 
-On macOS and Linux, `butlerPath` is usually unnecessary because the plugin finds the app-bundled or `PATH` binary automatically.
+The CLI reads `target` and `defaultChannel` from the same file as fallback defaults.
 
 ## Channels
 
@@ -208,23 +207,21 @@ A channel may combine platforms (for example `win-linux-mac`). Tags can be adjus
 
 ## Typical workflow
 
-The pattern is the same on every platform: build, stage a clean output folder, then push.
+The pattern is the same on every platform: build, stage a clean output folder, then push with the same CLI command.
 
-### Windows (Rust/Bevy example)
+### Windows
 
-```powershell
+```bat
 cargo build --release
 
-$dist = "dist/windows"
-New-Item -ItemType Directory -Force $dist | Out-Null
-Copy-Item target/release/mygame.exe $dist
-Copy-Item assets $dist -Recurse -Force
-Copy-Item README.md $dist -ErrorAction SilentlyContinue
+mkdir dist\windows
+copy target\release\mygame.exe dist\windows\
+xcopy assets dist\windows\assets /E /I /Y
 
-./release.ps1 -Source $dist -Target youruser/mygame -Channel windows -Version 1.0.0
+node release.js push --source dist\windows --target youruser/mygame --channel windows --version 1.0.0
 ```
 
-### macOS (Rust/Bevy example)
+### macOS
 
 ```bash
 cargo build --release
@@ -234,10 +231,10 @@ mkdir -p "$dist"
 cp -R "target/release/bundle/osx/MyGame.app" "$dist/"   # with cargo-bundle; otherwise copy the binary
 cp -R assets "$dist/"
 
-pwsh ./release.ps1 -Source "$dist" -Target youruser/mygame -Channel osx -Version 1.0.0
+node release.js push --source "$dist" --target youruser/mygame --channel osx --version 1.0.0
 ```
 
-### Linux (Rust/Bevy example)
+### Linux
 
 ```bash
 cargo build --release
@@ -247,31 +244,30 @@ mkdir -p "$dist"
 cp target/release/mygame "$dist/"
 cp -R assets "$dist/"
 
-pwsh ./release.ps1 -Source "$dist" -Target youruser/mygame -Channel linux -Version 1.0.0
+node release.js push --source "$dist" --target youruser/mygame --channel linux --version 1.0.0
 ```
 
 Push only the final build folder. Avoid uploading intermediate directories such as `target/`, and exclude debug symbols or caches. On macOS, push the `.app` bundle rather than loose binaries so symlinks and frameworks are preserved.
 
 ## Post-release hooks
 
-Hooks are opt-in. After a successful push, `release.ps1` runs the script passed with `-HookPath`:
+Hooks are opt-in and written in Node.js, so they run on every platform. After a successful push, the CLI runs the script passed with `--hook`:
 
-```powershell
-./release.ps1 -Source ./dist -Target youruser/mygame -HookPath ./examples/post-release-hook.ps1
+```bash
+node release.js push --source ./dist --target youruser/mygame \
+  --hook ./examples/post-release-hook.js
 ```
 
-See [`examples/post-release-hook.ps1`](examples/post-release-hook.ps1). On macOS and Linux the hook runs through PowerShell 7+, so it has the same capabilities as on Windows.
+See [`examples/post-release-hook.js`](examples/post-release-hook.js). The hook receives the release details through environment variables: `RELEASE_SOURCE`, `RELEASE_TARGET`, `RELEASE_CHANNEL`, and `RELEASE_VERSION`.
 
 ## Diagnostics
 
-`test-release.js` is platform-neutral and checks butler, its version, credentials, the configured target, and channel status:
-
 ```bash
-node test-release.js
-node test-release.js user/game
+node release.js check
+node release.js check user/game
 ```
 
-It requires Node.js, which is already available wherever the DeepSeek Harness runs.
+This checks butler, its version, credentials, and the configured target, and can query channel status. It works identically on all platforms and needs only Node.js.
 
 ## Project structure
 
@@ -282,10 +278,9 @@ It requires Node.js, which is already available wherever the DeepSeek Harness ru
 ├── example-config.yml              # Configuration example
 ├── locale/en.json                  # Plugin display metadata
 ├── icon.svg                        # Plugin icon
-├── release.ps1                     # The only operational PowerShell script
-├── test-release.js                 # Diagnostics (Node.js, all platforms)
+├── release.js                      # Standalone Node.js CLI (all platforms)
 ├── examples/
-│   └── post-release-hook.ps1       # Optional hook, passed with -HookPath
+│   └── post-release-hook.js        # Optional Node.js hook, passed with --hook
 ├── LICENSE.md                      # MIT license
 └── README.md
 ```
@@ -294,11 +289,11 @@ It requires Node.js, which is already available wherever the DeepSeek Harness ru
 
 | Symptom | Cause / fix |
 |---------|-------------|
-| `butler` is not recognized | Install the itch.io desktop app, pass `-ButlerPath`, or set `BUTLER_PATH`. |
+| `butler` is not recognized | Install the itch.io desktop app, pass `--butler`, or set `BUTLER_PATH`. |
 | `Permission denied` when running butler (macOS/Linux) | Run `chmod +x butler` on the extracted binary. |
-| `pwsh: command not found` (macOS/Linux) | Install PowerShell 7+, or call `butler` directly as shown in [Quick start](#quick-start). |
 | macOS blocks the butler binary | Allow it in System Settings → Privacy & Security, or remove the quarantine attribute with `xattr -d com.apple.quarantine butler`. |
-| `required argument 'target'` | Pass `-Target user/game` or configure `target`. |
+| `node: command not found` | Install Node.js 18+ (the DeepSeek Harness already provides a compatible runtime). |
+| `required argument 'target'` | Pass `--target user/game` or configure `target`. |
 | `invalid target` or `403` | Wrong slug, or the project does not belong to the authenticated account. |
 | Authentication errors | Run `butler login` and retry. |
 | First push is slow | Expected: the first upload sends the full build; later pushes send deltas. |
@@ -312,7 +307,7 @@ It requires Node.js, which is already available wherever the DeepSeek Harness ru
 
 ## Contributing
 
-Issues and pull requests are welcome. Keep changes focused, run the diagnostics before submitting, and update the README when behavior changes.
+Issues and pull requests are welcome. Keep changes focused, run `node release.js check` before submitting, and update the README when behavior changes. Platform-specific code is out of scope: the project targets Node.js on all platforms.
 
 ## License
 
